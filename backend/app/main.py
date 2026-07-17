@@ -407,17 +407,30 @@ async def logout():
 # ═══════════════════════════════════════════════
 
 @app.post("/api/v1/chat/message")
-async def chat_message(data: ChatReq, user: User = Depends(get_current_user)):
+async def chat_message(data: ChatReq, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     content = sanitize_input(data.content, 5000)
     if not content:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
     
-    # Try OpenAI/Gemini if configured, otherwise use built-in Mia
-    reply = await get_mia_response(content, user.full_name)
-    return _chat_response(reply)
+    # Get AI response + execute actions
+    reply, actions = await get_mia_response(content, user.full_name, str(user.id), db)
+    
+    return {
+        "message": {
+            "id": str(uuid.uuid4()),
+            "conversation_id": str(uuid.uuid4()),
+            "role": "assistant",
+            "content": reply,
+            "intent_detected": actions[0]["type"] if actions else None,
+            "actions_taken": actions,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "actions": actions,
+        "follow_up_questions": [],
+    }
 
 
-async def get_mia_response(message: str, user_name: str) -> str:
+async def get_mia_response(message: str, user_name: str, user_id: str = "", db: AsyncSession = None) -> tuple:
     """Get response from Gemini AI or built-in responses."""
     msg = message.lower().strip()
     
@@ -434,7 +447,28 @@ async def get_mia_response(message: str, user_name: str) -> str:
                 resp = await client.post(url, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
-                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                    ai_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    # Execute any actions detected by AI
+                    actions = []
+                    if db and user_id:
+                        import re
+                        # Detect reminder-like responses
+                        if any(w in msg for w in ["remind", "reminder", "don't forget"]):
+                            title = message.replace("remind me to", "").replace("remind me", "").strip()
+                            if title and len(title) > 2:
+                                remind_at = datetime.now(timezone.utc) + timedelta(hours=1)
+                                reminder = Reminder(user_id=user_id, title=title[:200], remind_at=remind_at, is_persistent=True)
+                                db.add(reminder)
+                                await db.flush()
+                                actions.append({"type": "reminder_created", "title": title[:200]})
+                        if any(w in msg for w in ["add task", "todo", "to-do", "to do list", "add to list"]):
+                            title = message.replace("add task", "").replace("add to my to do list", "").replace("add to my list", "").strip()
+                            if title and len(title) > 2:
+                                todo = Todo(user_id=user_id, title=title[:200], priority=3)
+                                db.add(todo)
+                                await db.flush()
+                                actions.append({"type": "todo_created", "title": title[:200]})
+                    return ai_text, actions
                 else:
                     logger.warning(f"Gemini API error {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
@@ -453,64 +487,51 @@ async def get_mia_response(message: str, user_name: str) -> str:
                 ],
                 max_tokens=1024,
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content, []
         except Exception as e:
             logger.warning(f"OpenAI failed: {e}")
     
     # Built-in Mia responses (works without any API key)
     if any(w in msg for w in ["hello", "hi", "hey", "good morning", "good afternoon"]):
-        return f"Hey {user_name}! I'm Mia, your personal assistant. How can I help you today? I can help with reminders, to-do lists, scheduling, and more!"
+        return f"Hey {user_name}! I'm Mia, your personal assistant. How can I help you today?", []
     
     if any(w in msg for w in ["remind", "reminder", "don't forget", "remember"]):
-        return f"I'd love to set a reminder for you! Tell me:\n\n1. What should I remind you about?\n2. When? (e.g., 'tomorrow at 8 AM')\n\nOr use the Reminders tab to create one directly!"
+        # Actually create the reminder
+        actions = []
+        title = message.replace("remind me to", "").replace("remind me", "").replace("set a reminder", "").strip()
+        if title and len(title) > 2 and db and user_id:
+            remind_at = datetime.now(timezone.utc) + timedelta(hours=1)
+            reminder = Reminder(user_id=user_id, title=title[:200], remind_at=remind_at, is_persistent=True)
+            db.add(reminder)
+            await db.flush()
+            actions.append({"type": "reminder_created", "title": title[:200]})
+            return f"Done! I've set a reminder: **{title}** (in 1 hour). I'll make sure you don't forget!", actions
+        return f"What should I remind you about? And when?", []
     
-    if any(w in msg for w in ["todo", "to-do", "task", "to do", "list"]):
-        return f"Let's organize your tasks! You can:\n\n• Tell me what tasks you need to do\n• I'll help you prioritize them\n• Or go to the Tasks tab to add them directly\n\nWhat do you need to get done?"
+    if any(w in msg for w in ["todo", "to-do", "task", "to do", "list", "add task"]):
+        actions = []
+        title = message.replace("add task", "").replace("add to my list", "").replace("create task", "").replace("todo", "").replace("to-do", "").strip()
+        if title and len(title) > 2 and db and user_id:
+            todo = Todo(user_id=user_id, title=title[:200], priority=3)
+            db.add(todo)
+            await db.flush()
+            actions.append({"type": "todo_created", "title": title[:200]})
+            return f"Added to your list: **{title}**. Anything else?", actions
+        return f"What task would you like to add?", []
     
     if any(w in msg for w in ["schedule", "plan", "calendar", "event", "meeting"]):
-        return f"I can help you plan! Tell me about your events or meetings and I'll help organize your day. What's coming up?"
+        return f"I can help you plan! Tell me about your events and I'll help organize your day.", []
     
     if any(w in msg for w in ["alarm", "wake", "wake up"]):
-        return f"I can help with alarms! Tell me what time you'd like to be woken up or reminded, and whether it should repeat daily."
+        return f"Tell me what time you'd like to be woken up!", []
     
     if any(w in msg for w in ["thank", "thanks", "appreciate"]):
-        return f"You're welcome, {user_name}! I'm always here to help. Anything else I can do for you?"
-    
-    if any(w in msg for w in ["how are you", "how do you feel", "what's up"]):
-        return f"I'm doing great, thanks for asking! I'm ready to help you stay organized. What can I help you with today?"
+        return f"You're welcome, {user_name}! Always here to help.", []
     
     if any(w in msg for w in ["help", "what can you do", "features"]):
-        return f"Here's what I can help you with:\n\n⏰ **Reminders** - Never forget anything\n✅ **To-Do Lists** - Track your tasks\n📅 **Scheduling** - Plan your days\n🔔 **Alarms** - Wake up on time\n\nJust tell me what you need in plain English!"
+        return f"I can:\n• Set reminders ('remind me to...')\n• Create tasks ('add task...')\n• Plan your schedule\n• Answer questions\n\nJust tell me what you need!", []
     
-    if any(w in msg for w in ["study", "exam", "homework", "assignment"]):
-        return f"Study time! I can help you:\n\n• Create a study schedule\n• Set reminders for deadlines\n• Break assignments into smaller tasks\n\nWhat subject or assignment do you need help organizing?"
-    
-    if any(w in msg for w in ["work", "project", "deadline"]):
-        return f"Let's manage your work! Tell me about your project or deadline and I'll help you break it down into manageable steps."
-    
-    if any(w in msg for w in ["tired", "stressed", "overwhelmed"]):
-        return f"I hear you, {user_name}. Let me help lighten your load. Tell me what's on your plate and I'll help you prioritize. One step at a time!"
-    
-    if any(w in msg for w in ["good night", "bye", "goodbye", "see you"]):
-        return f"Good night, {user_name}! Sleep well. I'll be here whenever you need me. Don't forget to check your reminders for tomorrow!"
-    
-    # Default response
-    return f"Thanks for your message, {user_name}! I'm here to help you stay organized. You can ask me to:\n\n• Set reminders\n• Create to-do lists\n• Plan your schedule\n• Set alarms\n\nWhat would you like help with?"
-
-def _chat_response(content: str):
-    return {
-        "message": {
-            "id": str(uuid.uuid4()),
-            "conversation_id": str(uuid.uuid4()),
-            "role": "assistant",
-            "content": content,
-            "intent_detected": None,
-            "actions_taken": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        },
-        "actions": [],
-        "follow_up_questions": [],
-    }
+    return f"I'm here to help! Try: 'remind me to...' or 'add task...' and I'll do it for you.", []
 
 # ═══════════════════════════════════════════════
 # REMINDERS

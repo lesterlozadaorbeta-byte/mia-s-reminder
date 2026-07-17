@@ -78,7 +78,7 @@ class User(Base):
     language = Column(String(10), default="en")
     theme = Column(String(20), default="system")
     telegram_chat_id = Column(String(100), nullable=True)
-    notification_prefs = Column("notification_preferences", Text, default="{}")
+    notification_prefs = Column("notification_preferences", JSON, default=dict)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login_at = Column(DateTime, nullable=True)

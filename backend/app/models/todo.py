@@ -82,7 +82,6 @@ class Todo(Base):
     # Relationships
     user = relationship("User", back_populates="todos")
     category = relationship("TodoCategory", back_populates="todos")
-    subtasks = relationship("Todo", backref="parent", remote_side=[id])
 
     def __repr__(self):
         return f"<Todo {self.title}>"

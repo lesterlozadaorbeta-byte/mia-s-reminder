@@ -53,12 +53,12 @@ class User(Base):
     )
     last_login_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Relationships
-    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
-    calendars = relationship("Calendar", back_populates="user", cascade="all, delete-orphan")
-    todos = relationship("Todo", back_populates="user", cascade="all, delete-orphan")
-    reminders = relationship("Reminder", back_populates="user", cascade="all, delete-orphan")
-    alarms = relationship("Alarm", back_populates="user", cascade="all, delete-orphan")
+    # Relationships (lazy loaded to avoid circular import issues)
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan", lazy="dynamic")
+    calendars = relationship("Calendar", back_populates="user", cascade="all, delete-orphan", lazy="dynamic")
+    todos = relationship("Todo", back_populates="user", cascade="all, delete-orphan", lazy="dynamic")
+    reminders = relationship("Reminder", back_populates="user", cascade="all, delete-orphan", lazy="dynamic")
+    alarms = relationship("Alarm", back_populates="user", cascade="all, delete-orphan", lazy="dynamic")
 
     def __repr__(self):
         return f"<User {self.email}>"

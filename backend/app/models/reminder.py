@@ -56,9 +56,9 @@ class Reminder(Base):
     notify_telegram = Column(Boolean, default=True)
     notify_email = Column(Boolean, default=False)
 
-    # Attachments and metadata
+    # Attachments and extra data
     attachments = Column(JSON, default=list)  # List of attachment URLs
-    metadata = Column(JSON, default=dict)
+    extra_data = Column(JSON, default=dict)
 
     # AI metadata
     created_by_ai = Column(Boolean, default=False)

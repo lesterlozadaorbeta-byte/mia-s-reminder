@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from jose import jwt
 from passlib.context import CryptContext
 from sqlalchemy import Column, String, Boolean, DateTime, JSON, text, select
@@ -68,12 +68,12 @@ def create_token(user_id: str, minutes: int = 30) -> str:
 
 # --- Schemas ---
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     full_name: str
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class TokenResponse(BaseModel):

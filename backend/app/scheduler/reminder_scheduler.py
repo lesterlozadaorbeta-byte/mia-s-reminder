@@ -8,7 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import AsyncSessionLocal
+from app.core.database import get_session_factory
 from app.models.reminder import Reminder
 from app.models.alarm import Alarm
 
@@ -19,7 +19,7 @@ scheduler = AsyncIOScheduler()
 
 async def check_reminders():
     """Check for reminders that need to be triggered."""
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         now = datetime.now(timezone.utc)
 
         # Find active reminders that are due
@@ -140,7 +140,7 @@ def _advance_recurring_reminder(reminder: Reminder):
 
 async def check_alarms():
     """Check for alarms that need to trigger."""
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(

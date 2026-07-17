@@ -129,11 +129,11 @@ class NotificationService:
             return token
 
         # Fall back to database
-        from app.core.database import AsyncSessionLocal
+        from app.core.database import get_session_factory
         from app.models.user import User
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as db:
+        async with get_session_factory()() as db:
             result = await db.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
             if user and user.notification_preferences:
@@ -143,11 +143,11 @@ class NotificationService:
 
     async def _get_telegram_chat_id(self, user_id: str) -> Optional[str]:
         """Get user's Telegram chat ID."""
-        from app.core.database import AsyncSessionLocal
+        from app.core.database import get_session_factory
         from app.models.user import User
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as db:
+        async with get_session_factory()() as db:
             result = await db.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
             return user.telegram_chat_id if user else None

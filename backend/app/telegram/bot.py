@@ -16,7 +16,7 @@ from telegram.ext import (
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.core.database import AsyncSessionLocal
+from app.core.database import get_session_factory
 from app.models.user import User
 from app.models.reminder import Reminder
 from app.models.calendar import CalendarEvent
@@ -62,7 +62,7 @@ async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     username = update.effective_user.username
 
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
@@ -95,7 +95,7 @@ async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         # Get events
         events_result = await db.execute(
             select(CalendarEvent)
@@ -158,7 +158,7 @@ async def tomorrow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tomorrow_start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow_end = tomorrow_start + timedelta(days=1)
 
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         events_result = await db.execute(
             select(CalendarEvent)
             .where(
@@ -190,7 +190,7 @@ async def reminders_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please link your account first: /link your@email.com")
         return
 
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         result = await db.execute(
             select(Reminder)
             .where(
@@ -224,7 +224,7 @@ async def todos_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please link your account first: /link your@email.com")
         return
 
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         result = await db.execute(
             select(Todo)
             .where(
@@ -268,7 +268,7 @@ async def ask_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Process with AI
     from app.ai.engine import AIEngine
 
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         engine = AIEngine(db, user)
         response_text, actions, _ = await engine.process_message(
             user_message=question,
@@ -321,7 +321,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _mark_reminder_done(reminder_id: str, user_id):
     """Mark a reminder as done from Telegram."""
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         result = await db.execute(
             select(Reminder).where(
                 Reminder.id == reminder_id,
@@ -337,7 +337,7 @@ async def _mark_reminder_done(reminder_id: str, user_id):
 
 async def _snooze_reminder(reminder_id: str, user_id, minutes: int):
     """Snooze a reminder from Telegram."""
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         result = await db.execute(
             select(Reminder).where(
                 Reminder.id == reminder_id,
@@ -354,7 +354,7 @@ async def _snooze_reminder(reminder_id: str, user_id, minutes: int):
 
 async def _get_user_by_chat_id(chat_id: str):
     """Get user by Telegram chat ID."""
-    async with AsyncSessionLocal() as db:
+    async with get_session_factory()() as db:
         result = await db.execute(
             select(User).where(User.telegram_chat_id == chat_id)
         )

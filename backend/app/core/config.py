@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import List
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -19,6 +20,19 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/ai_assistant"
     database_sync_url: str = "postgresql://user:password@localhost:5432/ai_assistant"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def convert_database_url_to_async(cls, value: str) -> str:
+        """Convert sync-style postgres URLs (e.g. from Railway's DATABASE_URL) to
+        the async asyncpg driver URL required by SQLAlchemy's async engine."""
+        if not isinstance(value, str):
+            return value
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+asyncpg://", 1)
+        return value
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

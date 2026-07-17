@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.core.redis import redis_client
+from app.core.redis import get_redis_client
 from app.core.security import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,8 @@ async def check_ai_message_limit(user) -> bool:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     key = f"ai_usage:{user.id}:{today}"
 
-    current_count = await redis_client.get(key)
+    rc = get_redis_client()
+    current_count = await rc.get(key)
     if current_count and int(current_count) >= max_messages:
         return False  # Limit exceeded
 
@@ -81,7 +82,8 @@ async def increment_ai_usage(user):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     key = f"ai_usage:{user.id}:{today}"
 
-    pipe = redis_client.pipeline()
+    rc = get_redis_client()
+    pipe = rc.pipeline()
     pipe.incr(key)
     pipe.expire(key, 86400)  # Expire after 24 hours
     await pipe.execute()
@@ -91,7 +93,8 @@ async def get_ai_usage_today(user) -> int:
     """Get current AI message usage for today."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     key = f"ai_usage:{user.id}:{today}"
-    count = await redis_client.get(key)
+    rc = get_redis_client()
+    count = await rc.get(key)
     return int(count) if count else 0
 
 
@@ -134,11 +137,12 @@ async def check_rate_limit_per_user(user) -> bool:
     now = datetime.now(timezone.utc)
     minute_key = f"rpm:{user.id}:{now.strftime('%Y-%m-%d-%H-%M')}"
 
-    current = await redis_client.get(minute_key)
+    rc = get_redis_client()
+    current = await rc.get(minute_key)
     if current and int(current) >= max_rpm:
         return False
 
-    pipe = redis_client.pipeline()
+    pipe = rc.pipeline()
     pipe.incr(minute_key)
     pipe.expire(minute_key, 120)  # Keep for 2 minutes then auto-expire
     await pipe.execute()

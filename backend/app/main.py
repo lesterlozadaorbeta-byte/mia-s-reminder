@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from sqlalchemy import Column, String, Boolean, DateTime, JSON, Text, Integer, select
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -123,16 +122,22 @@ class Todo(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 # --- Security ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import hashlib
 
 def hash_password(password: str) -> str:
-    # Truncate to 72 bytes (bcrypt limit)
-    safe_password = password[:72]
-    return pwd_context.hash(safe_password)
+    """Simple SHA-256 hash with salt - no length limits."""
+    salt = uuid.uuid4().hex[:16]
+    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
+    return f"{salt}${hashed}"
 
-def verify_password(plain: str, hashed: str) -> bool:
-    safe_password = plain[:72]
-    return pwd_context.verify(safe_password, hashed)
+def verify_password(plain: str, stored: str) -> bool:
+    """Verify against our simple hash."""
+    try:
+        salt, hashed = stored.split("$", 1)
+        check = hashlib.sha256((salt + plain).encode()).hexdigest()
+        return check == hashed
+    except Exception:
+        return False
 
 def create_token(user_id: str, minutes: int = 60) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)

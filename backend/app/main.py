@@ -80,15 +80,15 @@ class User(Base):
     telegram_chat_id = Column(String(100), nullable=True)
     notification_prefs = Column("notification_preferences", JSON, default=dict)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    last_login_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
 
 class Conversation(Base):
     __tablename__ = "conversations"
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), nullable=False, index=True)
     title = Column(String(255), default="New Chat")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Message(Base):
     __tablename__ = "messages"
@@ -96,7 +96,7 @@ class Message(Base):
     conversation_id = Column(String(36), nullable=False, index=True)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Reminder(Base):
     __tablename__ = "reminders"
@@ -104,12 +104,12 @@ class Reminder(Base):
     user_id = Column(String(36), nullable=False, index=True)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
-    remind_at = Column(DateTime, nullable=False)
+    remind_at = Column(DateTime(timezone=True), nullable=False)
     is_recurring = Column(Boolean, default=False)
     recurrence_type = Column(String(20), nullable=True)
     is_persistent = Column(Boolean, default=True)
     status = Column(String(20), default="active")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class Todo(Base):
     __tablename__ = "todos"
@@ -119,8 +119,8 @@ class Todo(Base):
     description = Column(Text, nullable=True)
     priority = Column(Integer, default=3)
     is_completed = Column(Boolean, default=False)
-    due_date = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 # --- Security ---
 import hashlib

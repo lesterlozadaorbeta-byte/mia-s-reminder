@@ -165,6 +165,7 @@
         async function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            document.getElementById('error').textContent = '';
             try {
                 const res = await fetch(API_URL + '/auth/login', {
                     method: 'POST',
@@ -179,13 +180,14 @@
                 } else {
                     document.getElementById('error').textContent = data.detail || 'Login failed';
                 }
-            } catch(e) { document.getElementById('error').textContent = 'Error: ' + e.message; }
+            } catch(e) { document.getElementById('error').textContent = 'Cannot connect to server. Please try again.'; console.error(e); }
         }
 
         async function register() {
             const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            document.getElementById('error').textContent = '';
             try {
                 const res = await fetch(API_URL + '/auth/register', {
                     method: 'POST',
@@ -200,7 +202,7 @@
                 } else {
                     document.getElementById('error').textContent = data.detail || 'Registration failed';
                 }
-            } catch(e) { document.getElementById('error').textContent = 'Error: ' + e.message; }
+            } catch(e) { document.getElementById('error').textContent = 'Cannot connect to server. Please try again.'; console.error(e); }
         }
 
         function sendSuggestion(text) {

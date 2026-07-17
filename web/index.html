@@ -179,7 +179,7 @@
                 } else {
                     document.getElementById('error').textContent = data.detail || 'Login failed';
                 }
-            } catch(e) { document.getElementById('error').textContent = 'Connection error'; }
+            } catch(e) { document.getElementById('error').textContent = 'Error: ' + e.message; }
         }
 
         async function register() {
@@ -200,7 +200,7 @@
                 } else {
                     document.getElementById('error').textContent = data.detail || 'Registration failed';
                 }
-            } catch(e) { document.getElementById('error').textContent = 'Connection error'; }
+            } catch(e) { document.getElementById('error').textContent = 'Error: ' + e.message; }
         }
 
         function sendSuggestion(text) {

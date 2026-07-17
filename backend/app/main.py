@@ -120,41 +120,51 @@ async def root():
 async def health():
     return {"status": "healthy"}
 
-@app.post("/api/v1/auth/register", response_model=TokenResponse)
+@app.post("/api/v1/auth/register")
 async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    # Check existing
-    result = await db.execute(select(User).where(User.email == data.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Email already registered")
-    
-    user = User(
-        email=data.email,
-        full_name=data.full_name,
-        hashed_password=hash_password(data.password),
-    )
-    db.add(user)
-    await db.flush()
-    
-    token = create_token(str(user.id))
-    refresh = create_token(str(user.id), minutes=10080)
-    
-    return TokenResponse(access_token=token, refresh_token=refresh)
+    try:
+        # Check existing
+        result = await db.execute(select(User).where(User.email == data.email))
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Email already registered")
+        
+        user = User(
+            email=data.email,
+            full_name=data.full_name,
+            hashed_password=hash_password(data.password),
+        )
+        db.add(user)
+        await db.flush()
+        
+        token = create_token(str(user.id))
+        refresh = create_token(str(user.id), minutes=10080)
+        
+        return {"access_token": token, "refresh_token": refresh, "token_type": "bearer", "expires_in": 1800}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
-@app.post("/api/v1/auth/login", response_model=TokenResponse)
+@app.post("/api/v1/auth/login")
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
-    
-    if not user or not user.hashed_password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not verify_password(data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    user.last_login_at = datetime.now(timezone.utc)
-    token = create_token(str(user.id))
-    refresh = create_token(str(user.id), minutes=10080)
-    
-    return TokenResponse(access_token=token, refresh_token=refresh)
+    try:
+        result = await db.execute(select(User).where(User.email == data.email))
+        user = result.scalar_one_or_none()
+        
+        if not user or not user.hashed_password:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        if not verify_password(data.password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        user.last_login_at = datetime.now(timezone.utc)
+        token = create_token(str(user.id))
+        refresh = create_token(str(user.id), minutes=10080)
+        
+        return {"access_token": token, "refresh_token": refresh, "token_type": "bearer", "expires_in": 1800}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 @app.post("/api/v1/chat/message")
 async def chat_message(data: ChatRequest, db: AsyncSession = Depends(get_db)):

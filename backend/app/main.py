@@ -14,8 +14,6 @@ from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import get_settings
-from app.core.database import init_db, close_db
-from app.core.redis import close_redis
 from app.core.bootstrap import make_first_user_admin
 from app.api import api_router
 from app.scheduler.reminder_scheduler import start_scheduler, stop_scheduler
@@ -94,6 +92,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.app_env}")
     logger.info(f"Debug: {settings.debug}")
 
+    from app.core.database import init_db, close_db
+    from app.core.redis import close_redis
+
     await init_db()
     await make_first_user_admin()
     start_scheduler()
@@ -118,6 +119,8 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down...")
     stop_scheduler()
+    from app.core.database import close_db
+    from app.core.redis import close_redis
     await close_db()
     await close_redis()
     logger.info("Shutdown complete")

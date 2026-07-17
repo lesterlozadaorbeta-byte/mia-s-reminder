@@ -234,8 +234,8 @@ async def register(data: RegisterReq, db: AsyncSession = Depends(get_db)):
         # Validate
         if not data.email or "@" not in data.email:
             raise HTTPException(status_code=400, detail="Invalid email")
-        if len(data.password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        if len(data.password) < 4:
+            raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
         if not data.full_name:
             raise HTTPException(status_code=400, detail="Name is required")
 

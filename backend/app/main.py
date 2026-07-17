@@ -201,9 +201,10 @@ async def health():
     # Check DB
     db_ok = False
     try:
+        from sqlalchemy import text as sa_text
         from app.core.database import engine
         async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
+            await conn.execute(sa_text("SELECT 1"))
             db_ok = True
     except Exception:
         pass

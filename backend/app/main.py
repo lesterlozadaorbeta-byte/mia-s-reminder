@@ -15,6 +15,7 @@ from sqlalchemy import Column, String, Boolean, DateTime, JSON, Text, Integer, s
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+import uuid as uuid_mod
 
 # --- Config ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -68,7 +69,7 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid_mod.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=True)
     full_name = Column(String(255), nullable=False)
@@ -205,7 +206,7 @@ async def get_current_user(authorization: Optional[str] = Header(None), db: Asyn
     user_id = decode_token(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == uuid_mod.UUID(user_id)))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
@@ -262,8 +263,8 @@ async def register(data: RegisterReq, db: AsyncSession = Depends(get_db)):
         await db.flush()
         await db.refresh(user)
         
-        access_token = create_token(user.id)
-        refresh_token = create_token(user.id, minutes=10080)
+        access_token = create_token(str(user.id))
+        refresh_token = create_token(str(user.id), minutes=10080)
         
         logger.info(f"User registered: {data.email}")
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "expires_in": 3600}
@@ -285,8 +286,8 @@ async def login(data: LoginReq, db: AsyncSession = Depends(get_db)):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         
         user.last_login_at = datetime.now(timezone.utc)
-        access_token = create_token(user.id)
-        refresh_token = create_token(user.id, minutes=10080)
+        access_token = create_token(str(user.id))
+        refresh_token = create_token(str(user.id), minutes=10080)
         
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "expires_in": 3600}
     except HTTPException:
@@ -297,7 +298,7 @@ async def login(data: LoginReq, db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/v1/auth/me")
 async def get_me(user: User = Depends(get_current_user)):
-    return {"id": user.id, "email": user.email, "full_name": user.full_name, "timezone": user.timezone_str}
+    return {"id": str(user.id), "email": user.email, "full_name": user.full_name, "timezone": user.timezone_str}
 
 # --- AI Chat ---
 @app.post("/api/v1/chat/message")
